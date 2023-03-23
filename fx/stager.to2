@@ -1,0 +1,25 @@
+// stage: automatic staging support
+
+use { Common } from fx::common
+
+pub fn count_flameout(common: Common) -> int = {
+    common.vessel.staging
+        .parts_in_stage(common.vessel.staging.current)
+        .filter(fn(part) -> part.is_engine)
+        .filter(fn(part) -> part.engine_module.defined)
+        .map(fn(part) -> part.engine_module.value)
+        .filter(fn(eng) -> eng.is_flameout)
+        .length
+}
+
+pub fn maybe_stage(common: Common) -> Unit = {
+    if (2 > common.vessel.staging.current) {
+        return
+    }
+    if (common.clear_of_pad()) {
+        if ((0.0 == common.vessel.available_thrust) ||
+            (0 < count_flameout(common))) {
+                common.vessel.staging.next()
+        }
+    }
+}

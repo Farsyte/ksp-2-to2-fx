@@ -1,0 +1,56 @@
+use { Vessel } from ksp::vessel
+use { ThrottleManager, SteeringManager } from ksp::control
+use { current_time } from ksp::game
+
+pub struct Common(vessel: Vessel) {
+    vessel : Vessel = vessel
+
+    t0: float = 0
+    pitch_over_angle: float = 3.0
+    launch_azimuth: float = 90.0
+
+    t_mgr: ThrottleManager = vessel.manage_throttle(fn(dt) -> 0.0)
+    //
+    // ThrottleManager allows us to specify a throttle setting from 0 to 1,
+    // were 0 is all engines cut and 1 is all engines full.
+    //
+    // things we can do with t_mgr:
+    //
+    //   t_mgr.throttle = 0
+    //   let curr = t_mgr.throttle
+    //
+    //   t_mgr.set_throttle_provider(fn (float) -> float)
+    //   t_mgr.release()
+    //   t_mgr.resume()
+
+    // s_mgr: SteeringManager = vessel.manage_steering(fn(dt) -> vec3(0.0, 0.0, 0.0))
+    //
+    // Steering Manager allows us to specify a pitch-yaw-roll command vector, where
+    // each element ranges from -1 to +1 (full deflection each way).
+    //
+    // things we could do with s_mgr:
+    //
+    //   s_mgr.pitch_yaw_roll = vec3(pitch, yaw, roll)
+    //   let cu = s_mgr.pitch_yaw_roll
+    //
+    //   s_mgr.set_pitch_yaw_roll_provider(fn (float) -> vec3)
+    //   s_mgr.release()
+    //   s_mgr.resume()
+}
+
+impl Common {
+    fn set_t0(self, t0: float) -> Unit = {
+        self.t0 = t0
+    }
+    fn met(self) -> float = {
+        return current_time() - self.t0
+    }
+    fn clear_of_pad(self) -> bool = {
+        (self.vessel.altitude_terrain > 100) &&
+        (self.vessel.altitude_scenery > 100)
+    }
+    fn near_pad(self) -> bool = {
+        (self.vessel.altitude_terrain < 100) ||
+        (self.vessel.altitude_scenery < 100)
+    }
+}

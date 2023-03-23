@@ -1,0 +1,104 @@
+use { CONSOLE } from ksp::console
+use { Common } from fx::common
+use { MODE_AUTOPILOT } from ksp::vessel
+
+pub struct Ascent(common: Common) {
+    common : Common = common
+    mode : int = 0
+    mode_met : float = 0.0
+}
+
+impl Ascent {
+    fn rollout(self) -> bool = {
+        const common = self.common
+//        if (self.mode != 1) {
+//            self.mode = 1
+//            self.mode_met = common.met()
+//
+//            const common = self.common
+//            const vessel = common.vessel
+//
+//            const pitch = 89.9
+//            const heading = common.launch_azimuth
+//            const direction = vessel.heading_direction(heading, pitch, 0).vector
+//
+//            common.t_mgr.throttle = 1.0
+//            vessel.autopilot.enabled = true
+//            vessel.autopilot.mode = MODE_AUTOPILOT
+//            vessel.autopilot.target_orientation = direction
+//            CONSOLE.print_line("Ascent.rollout rolling to heading " + heading.to_string())
+//        }
+        common.met() < self.mode_met + 10
+    }
+
+    fn pitchover(self) -> bool = {
+        const common = self.common
+//        if (self.mode != 2) {
+//            self.mode = 2
+//            self.mode_met = common.met()
+//
+//            const common = self.common
+//            const vessel = common.vessel
+//
+//            const pitch = 90.0 - common.pitch_over_angle
+//            const heading = common.launch_azimuth
+//            const direction = vessel.heading_direction(heading, pitch, 0).vector
+//
+//            common.t_mgr.throttle = 1.0
+//            vessel.autopilot.enabled = true
+//            vessel.autopilot.mode = MODE_AUTOPILOT
+//            vessel.autopilot.target_orientation = direction
+//            CONSOLE.print_line("Ascent.rollout pitching over to " + pitch.to_string())
+//        }
+        common.met() < self.mode_met + 10
+    }
+
+    fn gravityturn (self) -> bool = {
+        const common = self.common
+//        if (self.mode != 3 {
+//            self.mode = 3
+//            self.mode_met = common.met()
+//            CONSOLE.print_line("Ascent.gravityturn TBD")
+//        }
+        common.met() < self.mode_met + 10
+    }
+
+    sync fn gravityturn(self) -> bool = {
+        const common = self.common
+        const vessel = common.vessel
+
+        const des_ap = common.launch_altitude
+        const obs_ap = orbit.apoapsis | orbit.reference_body.SOI_radius
+        if (obs_ap > des_ap) {
+            CONSOLE.print_line("Ascent gravityturn complete, coast pointing prograde")
+
+            common.t_mgr.throttle = 0.0
+            vessel.autopilot.enabled = true
+            vessel.autopilot.mode = MODE_PROGRADE
+            return false
+        }
+
+        if (self.mode != 3) {
+            self.mode = 3
+            self.mode_met = common.met()
+
+            common.t_mgr.throttle = 1.0
+            vessel.autopilot.enabled = true
+            vessel.autopilot.mode = MODE_AUTOPILOT
+        }
+
+        const altitude_fraction = max(0,min(1,altitude / min(70000,orbit_altitude)).
+        const pitch_wanted = (90-launch_pitchover)*(1 - sqrt(altitude_fraction)).
+
+
+        const pitch = 90.0 - common.pitch_over_angle
+        const heading = common.launch_azimuth
+        const direction = vessel.heading_direction(heading, pitch, 0)
+
+        vessel.autopilot.target_orientation = direction:vector
+
+        // CONSOLE.print_line("Ascent.gravityturn pitching over to " + pitch.to_string())
+
+        common.met() < self.mode_met + 3.0
+    }
+}

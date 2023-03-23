@@ -1,0 +1,175 @@
+// plan: methods to build maneuver nodes.
+
+use { sqrt, min, max } from core::math
+
+use { current_time } from ksp::game
+use { Vec3, vec3 } from ksp::math
+use { Vessel, MODE_AUTOPILOT, MODE_PROGRADE } from ksp::vessel
+
+use { CONSOLE } from ksp::console
+use { Common } from fx::common
+
+pub struct Plan(common: Common) {
+    common : Common = common
+    mode : int = 0
+    mode_met : float = 0.0
+
+    chat_at : float = 0.0
+
+    burn_ut : float = 0.0
+    burn_dv : Vec3 = vec3(0,0,0)
+    burn_dt : float = 0.0
+    burn_vF : Vec3 = vec3(0,0,0)
+}
+
+impl Plan {
+    sync fn clear_nodes(self) -> Unit = {
+        const common = self.common
+        const vessel = common.vessel
+        for(node in vessel.maneuver.nodes) {
+            node.remove()
+        }
+    }
+
+    sync fn tdv(self, ut: float, dv: Vec3) -> Unit = {
+        const common = self.common
+        const vessel = common.vessel
+        vessel.maneuver.add_burn_vector(ut, dv)
+    }
+
+    sync fn circ_ap(self) -> bool = {
+        self.clear_nodes()
+
+        self.mode = 0
+
+        const common = self.common
+        const vessel = common.vessel
+        const orbit = vessel.orbit
+        const body = orbit.reference_body
+        const mu = body.grav_parameter
+
+        const t = current_time() + 30
+        const tc = orbit.next_apoapsis_time(t).value
+        const rc = orbit.radius(tc)
+        const vc = sqrt(mu / rc)
+        const vref = orbit.orbital_velocity(tc)
+        const rhat = orbit.radial_plus(tc)
+        const vhor = rhat.exclude_from(vref)
+        const vhat = vhor.normalized
+        const vdes = vhat * vc
+        const dv = vdes - vref
+
+        CONSOLE.print_line("plan circ_ap")
+
+        self.tdv(tc, dv)
+
+        // allow circ_ap to be called as a mission phase step.
+        false
+    }
+
+    sync fn exec(self) -> bool = {
+        const common = self.common
+        const vessel = common.vessel
+        const met = common.met()
+
+        // because node.burn_vector and node.burn_duration do not change
+        // as we burn within the timespan of the vector, our best way to
+        // execute a node is to compute the desired final velocity, then
+        // burn to accelerate to that velocity.
+        //
+        // right now the only thing I'm using the node for is to have KSP-2
+        // compute the burn_duration and burn start time.
+
+        const opt_node = vessel.maneuver.next_node()
+        if (!opt_node.success) {
+            CONSOLE.print_line("Plan run: no node to run.")
+        } else {
+            const node = opt_node.value
+
+            if ((self.mode != 1) && (self.mode != 2)) {
+                self.mode = 1
+                self.mode_met = met
+                self.burn_dv = node.burn_vector.normalized
+                self.burn_dt = node.burn_duration
+                self.burn_ut = current_time() + node.ETA
+
+                CONSOLE.print_line("Plan run: align to maneuver.")
+
+                common.t_mgr.throttle = 0.0
+                vessel.autopilot.enabled = true
+                vessel.autopilot.mode = MODE_AUTOPILOT
+                vessel.autopilot.target_orientation = node.burn_vector
+                // NOTE: when we start doing time warps,
+                // remember that warp resets autopilot mode
+                // and we have to set it up again.
+
+                self.chat_at = met + 1000.0
+            }
+
+            if (node.ETA > 0.5) {
+                return true
+            }
+
+            if (self.mode != 2) {
+                self.mode = 2
+                self.mode_met = met
+                CONSOLE.print_line("Plan run: initiate burn.")
+
+                self.burn_dv = node.burn_vector
+                self.burn_vF = vessel.orbital_velocity + self.burn_dv
+
+                common.t_mgr.set_throttle_provider(fn(dt) -> {
+                    const dv = self.burn_vF - vessel.orbital_velocity
+                    self.burn_dv = dv
+                    vessel.autopilot.target_orientation = dv
+
+                    const dv_cos = dv * vessel.facing.vector
+                    const max_th = max(1.0, vessel.available_thrust)
+                    // implicit use of a gain of 1.0 converting
+                    // from total delta-v to instant acceleration.
+                    const use_th = dv_cos * vessel.mass / max_th
+                    max(0.0, min(1.0, use_th))
+                })
+
+                self.chat_at = met
+
+                CONSOLE.print_line("exec plan:"+
+                    " burn_vF: " + self.burn_vF.to_string())
+            }
+
+            if (self.chat_at <= met) {
+                self.chat_at = met + 1.0
+                const dv_cos = self.burn_dv * vessel.facing.vector
+                CONSOLE.print_line("exec plan:"+
+                    " burn_dv: " + self.burn_dv.to_string() +
+                    " dv_cos: " + dv_cos.to_string())
+            }
+
+            // NOTE: while we are doing our burn for the maneuver node,
+            // the "burn_vector" and "burn_duration" in the node do not
+            // get updated.
+
+            if (self.mode == 2 && self.burn_dv.magnitude <= 0.01) {
+                const dv_raw = self.burn_vF - vessel.orbital_velocity
+                CONSOLE.print_line("Plan run done: burn complete"+
+                    " (burn_dv:"+self.burn_dv.to_string()+")")
+            } else if (node.burn_duration < 0.01) {
+                CONSOLE.print_line("Plan run done: effectively no burn remaining")
+            } else if (node.burn_vector.normalized * self.burn_dir <= 0.0) {
+                CONSOLE.print_line("Plan run done: burn vector rotated more than 90 degrees")
+            } else if (met > self.burn_done) {
+                CONSOLE.print_line("Plan run done: beyond the burn sunset time")
+            } else {
+                return true
+            }
+            node.remove()
+        }
+
+        common.t_mgr.throttle = 0.0
+        vessel.autopilot.enabled = true
+        vessel.autopilot.mode = MODE_PROGRADE
+        self.mode = 0
+
+        false
+    }
+}

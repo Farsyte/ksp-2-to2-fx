@@ -1,39 +1,44 @@
-use { Vessel, MODE_AUTOPILOT, MODE_PROGRADE, MODE_STABILITYASSIST } from ksp::vessel
-use { CONSOLE } from ksp::console
-use { max } from core::math
-use { sleep, current_time } from ksp::game
 
 // tinker: a place for me to scribble my experiments.
 
+use { Vessel, MODE_STABILITYASSIST } from ksp::vessel
+use { CONSOLE } from ksp::console
+use { max, ceiling, round } from core::math
+use { sleep, current_time } from ksp::game
+
+use { Common } from fx::common
+use { maybe_stage } from fx::stager
+use { pick_t0 } from fx::launch
+use { countdown, liftoff } from fx::launch
+
+fn tick() -> Unit = {
+    sleep(0.0)
+}
+
 pub fn main_flight( vessel: Vessel, target_apoapsis: float = 80000.0, heading: float = 90.0 ) -> Result<Unit, string> = {
+
+    let common = Common(vessel)
+
+    common.t0 = pick_t0(common)
+
     CONSOLE.clear()
     CONSOLE.print_line("Vessel: " + vessel.name)
 
-    for (countdown in 0..10) {
-        CONSOLE.print_line("T-" + (10-countdown).to_string())
-        sleep(1)
+    while (countdown(common)) {
+        tick()
     }
 
-    // simplest possible throttle control: set throttle to full.
-    let throttle_manager = vessel.set_throttle(1.0)
+    while (liftoff(common)) {
+        maybe_stage(vessel)
+        tick()
+    }
 
-    vessel.staging.next()
+    // pick a constant steering attitude for now.
+    common.s_mgr.pitch_yaw_roll = vec3(85, 90, 0)
+    CONSOLE.print_line("steering set to heading 90, pitch 85, roll 0")
 
-    // simplest possible steering: use SAS to limit angular rate.
-    vessel.actions.sas = true
-    vessel.autopilot.mode = MODE_STABILITYASSIST
-
-    let t0 = current_time()
-    for(i in 0..40) {
-        sleep(1)
-
-        let ut = current_time()
-        let met = ut - t0
-
-        let pos = vessel.orbit.relative_position(ut)
-        let vel = vessel.orbit.orbital_velocity(ut)
-
-        CONSOLE.print_line("MET: " + met.to_string() + " pos: " + pos.to_string() + " vel: " + vel.to_string() )
-
+    while (true) {
+        sleep(1/25)
+        maybe_stage(vessel)
     }
 }

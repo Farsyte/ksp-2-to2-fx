@@ -1,0 +1,43 @@
+const int_nil : Option<int> = None()
+const int_one : Option<int> = Some(1)
+
+const str_nil : Option<string> = None()
+const str_one : Option<string> = Some("hello")
+
+pub struct StructOne(p1: float, p2: string) {
+    f1: float = p1
+    f2: string = p2
+}
+
+const s1_none : Option<StructOne> = None()
+const s1_example : StructOne = StructOne(1.0, "foo")
+const s1_some : Option<StructOne> = Some(s1_example)
+
+// 1. why can I call StructTwo with s2_none, when s2_none has the wrong type?
+// 2. why does KSP-2 crash if I change StructOne to StructTwo below?
+
+pub struct StructTwo(p1: float, p2: string, pn: Option<StructOne>) {
+    f1: float = p1
+    f2: string = p2
+    next: Option<StructOne> = pn
+}
+
+const s2_none : Option<StructTwo> = None()
+const s2_example : StructTwo = StructTwo(1.0, "foo", s2_none)
+const s2_some : Option<StructTwo> = Some(s2_example)
+
+pub type LinkedNames = (
+    link: Option<LinkedNames>,
+    name: string
+)
+
+const ln_none : Option<LinkedNames> = None()
+const ln_example : LinkedNames = LinkedNames(ln_none, "fred")
+const ln_some : Option<LinkedNames> = Some(ln_example)
+
+use { Vessel } from ksp::vessel
+use { CONSOLE } from ksp::console
+
+pub fn main_flight( vessel: Vessel) -> Result<Unit, string> = {
+    CONSOLE.print_line("hello from option.to2")
+}
